@@ -1034,7 +1034,6 @@ void* output_check_thread(void*) {
                 }
             }
         }
-        process_upload_queue();
     }
     return 0;
 }

@@ -1,6 +1,9 @@
 #include "file_upload.h"
 #include <queue>
 #include <mutex>
+#include <thread>
+#include <atomic>
+#include <chrono>
 #include <dirent.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -16,9 +19,21 @@ struct upload_task {
 
 static std::queue<upload_task> upload_queue;
 static std::mutex queue_mutex;
+static std::atomic<bool> uploader_running;
+static std::thread uploader_thread;
+
+static void process_upload_queue();
 
 void init_file_uploader() {
     curl_global_init(CURL_GLOBAL_DEFAULT);
+    uploader_running = true;
+    uploader_thread = std::thread([]() {
+        while (uploader_running) {
+            process_upload_queue();
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    });
+    uploader_thread.detach();
 }
 
 static bool upload_file(const upload_task& task) {
@@ -48,7 +63,7 @@ void enqueue_upload(const std::string& path, const file_data& data) {
     upload_queue.push({path, data, 0});
 }
 
-void process_upload_queue() {
+static void process_upload_queue() {
     std::queue<upload_task> work;
     {
         std::lock_guard<std::mutex> lock(queue_mutex);
@@ -67,10 +82,8 @@ void process_upload_queue() {
             if (task.config.delete_after_upload) {
                 unlink(task.path.c_str());
             } else {
-                std::string marker = task.path + ".uploaded";
-                FILE* f = fopen(marker.c_str(), "w");
-                if (f)
-                    fclose(f);
+                std::string renamed = task.path + ".uploaded";
+                rename(task.path.c_str(), renamed.c_str());
             }
         } else {
             task.next_try = time(NULL) + task.config.upload_retry_interval;
@@ -92,9 +105,8 @@ static void scan_directory(const file_data& cfg, const std::string& dir) {
         if (ent->d_type == DT_DIR && cfg.dated_subdirectories) {
             scan_directory(cfg, path);
         } else if (ent->d_type == DT_REG) {
-            if ((path.size() >= sizeof(".uploaded") - 1 &&
-                 path.substr(path.size() - (sizeof(".uploaded") - 1)) == ".uploaded") ||
-                access((path + ".uploaded").c_str(), F_OK) == 0) {
+            if (path.size() >= sizeof(".uploaded") - 1 &&
+                path.substr(path.size() - (sizeof(".uploaded") - 1)) == ".uploaded") {
                 continue;
             }
             if (cfg.suffix.empty() ||
@@ -116,7 +128,7 @@ void scan_pending_uploads() {
                 output_t* out = &ch->outputs[k];
                 if (out->type == O_FILE) {
                     file_data* fdata = (file_data*)out->data;
-                    if (fdata && !fdata->upload_url.empty()) {
+                    if (fdata && !fdata->upload_url.empty() && fdata->upload_pending_on_start) {
                         scan_directory(*fdata, fdata->basedir);
                     }
                 }
@@ -131,7 +143,7 @@ void scan_pending_uploads() {
             output_t* out = &ch->outputs[k];
             if (out->type == O_FILE) {
                 file_data* fdata = (file_data*)out->data;
-                if (fdata && !fdata->upload_url.empty()) {
+                if (fdata && !fdata->upload_url.empty() && fdata->upload_pending_on_start) {
                     scan_directory(*fdata, fdata->basedir);
                 }
             }

@@ -40,9 +40,10 @@ When using `file` outputs, recorded files can be uploaded via HTTP POST. Configu
 upload_url = "https://example.com/upload";
 delete_after_upload = true;
 upload_retry_interval = 60;
+upload_pending_on_start = false;
 ```
 
-Failed uploads are retried after `upload_retry_interval` seconds. If `delete_after_upload` is set, successful uploads remove the local copy; otherwise a `.uploaded` marker is written so retries are skipped on subsequent runs. Any pending files found at startup are enqueued automatically.
+Failed uploads are retried after `upload_retry_interval` seconds. If `delete_after_upload` is set, successful uploads remove the local copy; otherwise the file is renamed with a `.uploaded` suffix so retries are skipped on subsequent runs. Pending files can be scanned and enqueued on startup when `upload_pending_on_start` is set to `true`.
 
 ## Credits and thanks
 
