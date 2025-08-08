@@ -121,6 +121,16 @@ static int parse_outputs(libconfig::Setting& outs, channel_t* channel, int i, in
             fdata->append = (!outs[o].exists("append")) || (bool)(outs[o]["append"]);
             fdata->split_on_transmission = outs[o].exists("split_on_transmission") ? (bool)(outs[o]["split_on_transmission"]) : false;
             fdata->include_freq = outs[o].exists("include_freq") ? (bool)(outs[o]["include_freq"]) : false;
+            fdata->upload_url = outs[o].exists("upload_url") ? outs[o]["upload_url"].c_str() : "";
+            fdata->delete_after_upload = outs[o].exists("delete_after_upload") ? (bool)(outs[o]["delete_after_upload"]) : false;
+            fdata->upload_retry_interval = outs[o].exists("upload_retry_interval") ? (int)(outs[o]["upload_retry_interval"]) : 60;
+            if (outs[o].exists("upload_url") && fdata->upload_url.empty()) {
+                cerr << "Configuration error: devices[" << i << "] channels[" << j << "] outputs[" << o << "]: upload_url may not be empty\n";
+                error();
+            }
+            if (!fdata->upload_url.empty()) {
+                log(LOG_INFO, "File output will upload to %s delete_after_upload=%d retry_interval=%d\n", fdata->upload_url.c_str(), fdata->delete_after_upload, fdata->upload_retry_interval);
+            }
 
             channel->outputs[oo].has_mp3_output = true;
 

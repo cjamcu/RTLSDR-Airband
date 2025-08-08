@@ -59,6 +59,7 @@
 #include "input-common.h"
 #include "logging.h"
 #include "rtl_airband.h"
+#include "file_upload.h"
 #include "squelch.h"
 
 #ifdef WITH_PROFILING
@@ -1038,6 +1039,8 @@ int main(int argc, char* argv[]) {
             }
         }
     }
+    init_file_uploader();
+    scan_pending_uploads();
     THREAD output_check;
     pthread_create(&output_check, NULL, &output_check_thread, NULL);
 

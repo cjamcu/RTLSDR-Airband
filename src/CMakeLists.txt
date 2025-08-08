@@ -66,6 +66,10 @@ list(APPEND rtl_airband_extra_libs ${SHOUT_LIBRARIES})
 list(APPEND rtl_airband_include_dirs ${SHOUT_INCLUDE_DIRS})
 list(APPEND link_dirs ${SHOUT_LIBRARY_DIRS})
 
+find_package(CURL REQUIRED)
+list(APPEND rtl_airband_extra_libs ${CURL_LIBRARIES})
+list(APPEND rtl_airband_include_dirs ${CURL_INCLUDE_DIRS})
+
 set(CMAKE_REQUIRED_INCLUDES_SAVE ${CMAKE_REQUIRED_INCLUDES})
 set(CMAKE_REQUIRED_LIBRARIES_SAVE ${CMAKE_REQUIRED_LIBRARIES})
 set(CMAKE_REQUIRED_LINK_OPTIONS_SAVE ${CMAKE_REQUIRED_LINK_OPTIONS})
@@ -291,14 +295,15 @@ add_library (rtl_airband_base OBJECT
 	rtl_airband.cpp
 	squelch.cpp
 	ctcss.cpp
-	util.cpp
-	udp_stream.cpp
-	logging.cpp
-	filters.cpp
-	helper_functions.cpp
-	${CMAKE_CURRENT_BINARY_DIR}/version.cpp
-	${rtl_airband_extra_sources}
-	)
+        util.cpp
+        udp_stream.cpp
+        logging.cpp
+        filters.cpp
+        helper_functions.cpp
+        file_upload.cpp
+        ${CMAKE_CURRENT_BINARY_DIR}/version.cpp
+        ${rtl_airband_extra_sources}
+        )
 
 target_include_directories (rtl_airband_base PUBLIC
 	${CMAKE_CURRENT_BINARY_DIR} # needed for config.h
