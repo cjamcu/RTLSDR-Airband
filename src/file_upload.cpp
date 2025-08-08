@@ -1,8 +1,11 @@
 #include "file_upload.h"
+#include "logging.h"
 #include <queue>
+#include <set>
 #include <mutex>
 #include <thread>
 #include <atomic>
+#include <condition_variable>
 #include <chrono>
 #include <dirent.h>
 #include <unistd.h>
@@ -17,29 +20,25 @@ struct upload_task {
     time_t next_try;
 };
 
-static std::queue<upload_task> upload_queue;
+struct task_compare {
+    bool operator()(const upload_task& a, const upload_task& b) const {
+        return a.next_try > b.next_try;
+    }
+};
+
+static std::priority_queue<upload_task, std::vector<upload_task>, task_compare> upload_queue;
+static std::set<std::string> queued_files;
 static std::mutex queue_mutex;
+static std::condition_variable queue_cv;
 static std::atomic<bool> uploader_running;
 static std::thread uploader_thread;
 
-static void process_upload_queue();
-
-void init_file_uploader() {
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-    uploader_running = true;
-    uploader_thread = std::thread([]() {
-        while (uploader_running) {
-            process_upload_queue();
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
-    });
-    uploader_thread.detach();
-}
-
 static bool upload_file(const upload_task& task) {
     CURL* curl = curl_easy_init();
-    if (!curl)
+    if (!curl) {
+        log(LOG_ERR, "curl_easy_init() failed\n");
         return false;
+    }
 
     curl_mime* form = curl_mime_init(curl);
     curl_mimepart* part = curl_mime_addpart(form);
@@ -50,53 +49,88 @@ static bool upload_file(const upload_task& task) {
     curl_easy_setopt(curl, CURLOPT_MIMEPOST, form);
 
     CURLcode res = curl_easy_perform(curl);
+    long http_code = 0;
+    if (res == CURLE_OK) {
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    }
+    if (res != CURLE_OK) {
+        log(LOG_ERR, "Upload of %s failed: %s\n", task.path.c_str(), curl_easy_strerror(res));
+    } else if (http_code < 200 || http_code >= 300) {
+        log(LOG_ERR, "Upload of %s returned HTTP %ld\n", task.path.c_str(), http_code);
+    }
+
     curl_mime_free(form);
     curl_easy_cleanup(curl);
 
-    return res == CURLE_OK;
+    return res == CURLE_OK && http_code >= 200 && http_code < 300;
 }
 
 void enqueue_upload(const std::string& path, const file_data& data) {
     if (path.empty() || data.upload_url.empty())
         return;
     std::lock_guard<std::mutex> lock(queue_mutex);
-    upload_queue.push({path, data, 0});
+    if (queued_files.insert(path).second) {
+        upload_queue.push({path, data, 0});
+        queue_cv.notify_all();
+    }
 }
 
-static void process_upload_queue() {
-    std::queue<upload_task> work;
-    {
-        std::lock_guard<std::mutex> lock(queue_mutex);
-        std::swap(work, upload_queue);
-    }
-    while (!work.empty()) {
-        upload_task task = work.front();
-        work.pop();
-        time_t now = time(NULL);
-        if (task.next_try > now) {
-            std::lock_guard<std::mutex> lock(queue_mutex);
-            upload_queue.push(task);
-            continue;
-        }
-        if (upload_file(task)) {
-            if (task.config.delete_after_upload) {
-                unlink(task.path.c_str());
+void init_file_uploader() {
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+    uploader_running = true;
+    uploader_thread = std::thread([]() {
+        std::unique_lock<std::mutex> lock(queue_mutex);
+        while (uploader_running) {
+            if (upload_queue.empty()) {
+                queue_cv.wait(lock, [] { return !uploader_running || !upload_queue.empty(); });
+                if (!uploader_running)
+                    break;
             } else {
-                std::string renamed = task.path;
-                size_t dot = renamed.find_last_of('.');
-                if (dot != std::string::npos) {
-                    renamed.insert(dot, "_uploaded");
-                } else {
-                    renamed += "_uploaded";
+                time_t now = time(NULL);
+                time_t next = upload_queue.top().next_try;
+                if (next > now) {
+                    queue_cv.wait_until(lock, std::chrono::system_clock::from_time_t(next));
+                    continue;
                 }
-                rename(task.path.c_str(), renamed.c_str());
+
+                upload_task task = upload_queue.top();
+                upload_queue.pop();
+                queued_files.erase(task.path);
+                lock.unlock();
+
+                bool ok = upload_file(task);
+                if (ok) {
+                    if (task.config.delete_after_upload) {
+                        unlink(task.path.c_str());
+                    } else {
+                        std::string renamed = task.path;
+                        size_t dot = renamed.find_last_of('.');
+                        if (dot != std::string::npos) {
+                            renamed.insert(dot, "_uploaded");
+                        } else {
+                            renamed += "_uploaded";
+                        }
+                        rename(task.path.c_str(), renamed.c_str());
+                    }
+                } else {
+                    task.next_try = time(NULL) + task.config.upload_retry_interval;
+                    std::lock_guard<std::mutex> relock(queue_mutex);
+                    queued_files.insert(task.path);
+                    upload_queue.push(task);
+                    queue_cv.notify_all();
+                }
+                lock.lock();
             }
-        } else {
-            task.next_try = time(NULL) + task.config.upload_retry_interval;
-            std::lock_guard<std::mutex> lock(queue_mutex);
-            upload_queue.push(task);
         }
-    }
+    });
+}
+
+void shutdown_file_uploader() {
+    uploader_running = false;
+    queue_cv.notify_all();
+    if (uploader_thread.joinable())
+        uploader_thread.join();
+    curl_global_cleanup();
 }
 
 static void scan_directory(const file_data& cfg, const std::string& dir) {
@@ -159,3 +193,4 @@ void scan_pending_uploads() {
         }
     }
 }
+

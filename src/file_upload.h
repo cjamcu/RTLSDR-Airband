@@ -5,3 +5,4 @@
 void init_file_uploader();
 void enqueue_upload(const std::string& path, const file_data& data);
 void scan_pending_uploads();
+void shutdown_file_uploader();

@@ -1154,6 +1154,8 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    shutdown_file_uploader();
+
     close_debug();
 #ifdef WITH_PROFILING
     ProfilerStop();
