@@ -82,7 +82,13 @@ static void process_upload_queue() {
             if (task.config.delete_after_upload) {
                 unlink(task.path.c_str());
             } else {
-                std::string renamed = task.path + ".uploaded";
+                std::string renamed = task.path;
+                size_t dot = renamed.find_last_of('.');
+                if (dot != std::string::npos) {
+                    renamed.insert(dot, "_uploaded");
+                } else {
+                    renamed += "_uploaded";
+                }
                 rename(task.path.c_str(), renamed.c_str());
             }
         } else {
@@ -105,8 +111,11 @@ static void scan_directory(const file_data& cfg, const std::string& dir) {
         if (ent->d_type == DT_DIR && cfg.dated_subdirectories) {
             scan_directory(cfg, path);
         } else if (ent->d_type == DT_REG) {
-            if (path.size() >= sizeof(".uploaded") - 1 &&
-                path.substr(path.size() - (sizeof(".uploaded") - 1)) == ".uploaded") {
+            std::string filename = ent->d_name;
+            size_t dot = filename.find_last_of('.');
+            std::string stem = dot != std::string::npos ? filename.substr(0, dot) : filename;
+            if (stem.size() >= sizeof("_uploaded") - 1 &&
+                stem.substr(stem.size() - (sizeof("_uploaded") - 1)) == "_uploaded") {
                 continue;
             }
             if (cfg.suffix.empty() ||

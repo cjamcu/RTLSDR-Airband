@@ -43,7 +43,7 @@ upload_retry_interval = 60;
 upload_pending_on_start = false;
 ```
 
-Failed uploads are retried after `upload_retry_interval` seconds. If `delete_after_upload` is set, successful uploads remove the local copy; otherwise the file is renamed with a `.uploaded` suffix so retries are skipped on subsequent runs. Pending files can be scanned and enqueued on startup when `upload_pending_on_start` is set to `true`.
+Failed uploads are retried after `upload_retry_interval` seconds. If `delete_after_upload` is set, successful uploads remove the local copy; otherwise the file name has `_uploaded` inserted before the extension so retries are skipped on subsequent runs. Pending files can be scanned and enqueued on startup when `upload_pending_on_start` is set to `true`.
 
 ## Credits and thanks
 
