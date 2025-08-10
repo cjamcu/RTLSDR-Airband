@@ -1,18 +1,17 @@
 #include "file_upload.h"
-#include "logging.h"
-#include <queue>
-#include <set>
-#include <mutex>
-#include <thread>
-#include <atomic>
-#include <condition_variable>
-#include <chrono>
+#include <curl/curl.h>
 #include <dirent.h>
-#include <unistd.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <unistd.h>
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstdio>
-#include <curl/curl.h>
+#include <mutex>
+#include <queue>
+#include <set>
+#include <thread>
 
 struct upload_task {
     std::string path;
@@ -21,9 +20,7 @@ struct upload_task {
 };
 
 struct task_compare {
-    bool operator()(const upload_task& a, const upload_task& b) const {
-        return a.next_try > b.next_try;
-    }
+    bool operator()(const upload_task& a, const upload_task& b) const { return a.next_try > b.next_try; }
 };
 
 static std::priority_queue<upload_task, std::vector<upload_task>, task_compare> upload_queue;
@@ -148,13 +145,10 @@ static void scan_directory(const file_data& cfg, const std::string& dir) {
             std::string filename = ent->d_name;
             size_t dot = filename.find_last_of('.');
             std::string stem = dot != std::string::npos ? filename.substr(0, dot) : filename;
-            if (stem.size() >= sizeof("_uploaded") - 1 &&
-                stem.substr(stem.size() - (sizeof("_uploaded") - 1)) == "_uploaded") {
+            if (stem.size() >= sizeof("_uploaded") - 1 && stem.substr(stem.size() - (sizeof("_uploaded") - 1)) == "_uploaded") {
                 continue;
             }
-            if (cfg.suffix.empty() ||
-                (path.size() >= cfg.suffix.size() &&
-                 path.substr(path.size() - cfg.suffix.size()) == cfg.suffix)) {
+            if (cfg.suffix.empty() || (path.size() >= cfg.suffix.size() && path.substr(path.size() - cfg.suffix.size()) == cfg.suffix)) {
                 enqueue_upload(path, cfg);
             }
         }

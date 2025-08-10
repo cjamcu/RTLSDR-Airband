@@ -56,10 +56,10 @@
 #include <ctime>
 #include <iostream>
 #include <libconfig.h++>
+#include "file_upload.h"
 #include "input-common.h"
 #include "logging.h"
 #include "rtl_airband.h"
-#include "file_upload.h"
 #include "squelch.h"
 
 #ifdef WITH_PROFILING

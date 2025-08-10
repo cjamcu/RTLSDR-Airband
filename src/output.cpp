@@ -48,10 +48,10 @@
 #include <sstream>
 #include <string>
 #include "config.h"
+#include "file_upload.h"
 #include "helper_functions.h"
 #include "input-common.h"
 #include "rtl_airband.h"
-#include "file_upload.h"
 
 void shout_setup(icecast_data* icecast, mix_modes mixmode) {
     int ret;

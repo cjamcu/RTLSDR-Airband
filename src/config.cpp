@@ -113,10 +113,8 @@ static int parse_outputs(libconfig::Setting& outs, channel_t* channel, int i, in
                 cerr << "both directory and filename_template required for file\n";
                 error();
             }
-            if (outs[o]["directory"].getType() != libconfig::Setting::TypeString ||
-                outs[o]["filename_template"].getType() != libconfig::Setting::TypeString) {
-                cerr << "Configuration error: devices.[" << i << "] channels.[" << j << "] outputs.[" << o
-                     << "]: both directory and filename_template must be strings\n";
+            if (outs[o]["directory"].getType() != libconfig::Setting::TypeString || outs[o]["filename_template"].getType() != libconfig::Setting::TypeString) {
+                cerr << "Configuration error: devices.[" << i << "] channels.[" << j << "] outputs.[" << o << "]: both directory and filename_template must be strings\n";
                 error();
             }
             fdata->basedir = static_cast<const char*>(outs[o]["directory"]);
@@ -130,8 +128,7 @@ static int parse_outputs(libconfig::Setting& outs, channel_t* channel, int i, in
             fdata->include_freq = outs[o].exists("include_freq") ? (bool)(outs[o]["include_freq"]) : false;
             if (outs[o].exists("upload_url")) {
                 if (outs[o]["upload_url"].getType() != libconfig::Setting::TypeString) {
-                    cerr << "Configuration error: devices[" << i << "] channels[" << j << "] outputs[" << o
-                         << "]: upload_url must be a string\n";
+                    cerr << "Configuration error: devices[" << i << "] channels[" << j << "] outputs[" << o << "]: upload_url must be a string\n";
                     error();
                 }
                 fdata->upload_url = static_cast<const char*>(outs[o]["upload_url"]);
@@ -150,7 +147,8 @@ static int parse_outputs(libconfig::Setting& outs, channel_t* channel, int i, in
                 error();
             }
             if (!fdata->upload_url.empty()) {
-                log(LOG_INFO, "File output will upload to %s delete_after_upload=%d retry_interval=%d scan_on_start=%d\n", fdata->upload_url.c_str(), fdata->delete_after_upload, fdata->upload_retry_interval, fdata->upload_pending_on_start);
+                log(LOG_INFO, "File output will upload to %s delete_after_upload=%d retry_interval=%d scan_on_start=%d\n", fdata->upload_url.c_str(), fdata->delete_after_upload,
+                    fdata->upload_retry_interval, fdata->upload_pending_on_start);
             }
 
             channel->outputs[oo].has_mp3_output = true;
@@ -182,10 +180,8 @@ static int parse_outputs(libconfig::Setting& outs, channel_t* channel, int i, in
                 error();
             }
 
-            if (outs[o]["directory"].getType() != libconfig::Setting::TypeString ||
-                outs[o]["filename_template"].getType() != libconfig::Setting::TypeString) {
-                cerr << "Configuration error: devices.[" << i << "] channels.[" << j << "] outputs.[" << o
-                     << "]: both directory and filename_template must be strings\n";
+            if (outs[o]["directory"].getType() != libconfig::Setting::TypeString || outs[o]["filename_template"].getType() != libconfig::Setting::TypeString) {
+                cerr << "Configuration error: devices.[" << i << "] channels.[" << j << "] outputs.[" << o << "]: both directory and filename_template must be strings\n";
                 error();
             }
             fdata->basedir = static_cast<const char*>(outs[o]["directory"]);
