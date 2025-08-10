@@ -71,7 +71,6 @@ void enqueue_upload(const std::string& path, const file_data& data) {
         queue_cv.notify_all();
     }
 }
-
 void init_file_uploader() {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     uploader_running = true;
