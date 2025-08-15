@@ -29,4 +29,5 @@ typedef struct {
     int correction;     // PPM correction
     int gain;           // gain in tenths of dB
     int bufcnt;         // libusb buffer count
+    bool agc;           // enable AGC
 } rtlsdr_dev_data_t;

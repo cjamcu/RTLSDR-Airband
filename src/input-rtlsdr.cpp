@@ -118,36 +118,49 @@ int rtlsdr_init(input_t* const input) {
         log(LOG_ERR, "Failed to set freq correction for device #%d. Error %d.\n", dev_data->index, r);
     }
 
-    // Fitipower FC0012 gain needs to be initialized to its lowest value before setting it to the desired value
-    if (rtlsdr_get_tuner_type(rtl) == RTLSDR_TUNER_FC0012) {
-        int initialGain = 0;
-        if (rtlsdr_nearest_gain(rtl, -99, &initialGain) != true) {
+    if (dev_data->agc) {
+        r = rtlsdr_set_tuner_gain_mode(rtl, 0);
+        if (r < 0) {
+            log(LOG_ERR, "Failed to enable tuner AGC for device #%d. Error %d.\n", dev_data->index, r);
+        }
+        r = rtlsdr_set_agc_mode(rtl, 1);
+        if (r < 0) {
+            log(LOG_ERR, "Failed to enable AGC for device #%d. Error %d.\n", dev_data->index, r);
+        } else {
+            log(LOG_INFO, "Device #%d: AGC enabled\n", dev_data->index);
+        }
+    } else {
+        // Fitipower FC0012 gain needs to be initialized to its lowest value before setting it to the desired value
+        if (rtlsdr_get_tuner_type(rtl) == RTLSDR_TUNER_FC0012) {
+            int initialGain = 0;
+            if (rtlsdr_nearest_gain(rtl, -99, &initialGain) != true) {
+                log(LOG_ERR, "Failed to read supported gain list for device #%d\n", dev_data->index);
+                error();
+            }
+
+            r |= rtlsdr_set_tuner_gain(rtl, initialGain);
+            if (r < 0) {
+                log(LOG_ERR, "Failed to initialize gain for device #%d: error %d\n", (float)initialGain / 10.f, dev_data->index, r);
+            }
+        }
+
+        int ngain = 0;
+        if (rtlsdr_nearest_gain(rtl, dev_data->gain, &ngain) != true) {
             log(LOG_ERR, "Failed to read supported gain list for device #%d\n", dev_data->index);
             error();
         }
-
-        r |= rtlsdr_set_tuner_gain(rtl, initialGain);
+        r = rtlsdr_set_tuner_gain_mode(rtl, 1);
+        r |= rtlsdr_set_tuner_gain(rtl, ngain);
         if (r < 0) {
-            log(LOG_ERR, "Failed to initialize gain for device #%d: error %d\n", (float)initialGain / 10.f, dev_data->index, r);
+            log(LOG_ERR, "Failed to set gain to %0.2f for device #%d: error %d\n", (float)ngain / 10.f, dev_data->index, r);
+        } else {
+            log(LOG_INFO, "Device #%d: gain set to %0.2f dB\n", dev_data->index, (float)rtlsdr_get_tuner_gain(rtl) / 10.f);
         }
-    }
 
-    int ngain = 0;
-    if (rtlsdr_nearest_gain(rtl, dev_data->gain, &ngain) != true) {
-        log(LOG_ERR, "Failed to read supported gain list for device #%d\n", dev_data->index);
-        error();
-    }
-    r = rtlsdr_set_tuner_gain_mode(rtl, 1);
-    r |= rtlsdr_set_tuner_gain(rtl, ngain);
-    if (r < 0) {
-        log(LOG_ERR, "Failed to set gain to %0.2f for device #%d: error %d\n", (float)ngain / 10.f, dev_data->index, r);
-    } else {
-        log(LOG_INFO, "Device #%d: gain set to %0.2f dB\n", dev_data->index, (float)rtlsdr_get_tuner_gain(rtl) / 10.f);
-    }
-
-    r = rtlsdr_set_agc_mode(rtl, 0);
-    if (r < 0) {
-        log(LOG_ERR, "Failed to disable AGC for device #%d. Error %d.\n", dev_data->index, r);
+        r = rtlsdr_set_agc_mode(rtl, 0);
+        if (r < 0) {
+            log(LOG_ERR, "Failed to disable AGC for device #%d. Error %d.\n", dev_data->index, r);
+        }
     }
     rtlsdr_reset_buffer(rtl);
     log(LOG_INFO, "RTLSDR device %d initialized\n", dev_data->index);
@@ -199,15 +212,25 @@ int rtlsdr_parse_config(input_t* const input, libconfig::Setting& cfg) {
         cerr << "RTLSDR configuration error: no index and no serial number given\n";
         error();
     }
-    if (cfg.exists("gain")) {
-        if (cfg["gain"].getType() == libconfig::Setting::TypeInt) {  // backward compatibility
-            dev_data->gain = (int)cfg["gain"] * 10;
-        } else if (cfg["gain"].getType() == libconfig::Setting::TypeFloat) {
-            dev_data->gain = (int)((float)cfg["gain"] * 10.0f);
+    if (cfg.exists("agc")) {
+        dev_data->agc = (bool)cfg["agc"];
+    }
+    if (!dev_data->agc) {
+        if (cfg.exists("gain")) {
+            if (cfg["gain"].getType() == libconfig::Setting::TypeInt) {  // backward compatibility
+                dev_data->gain = (int)cfg["gain"] * 10;
+            } else if (cfg["gain"].getType() == libconfig::Setting::TypeFloat) {
+                dev_data->gain = (int)((float)cfg["gain"] * 10.0f);
+            }
+        } else {
+            cerr << "RTLSDR configuration error: gain is not configured and AGC is not enabled\n";
+            error();
         }
     } else {
-        cerr << "RTLSDR configuration error: gain is not configured\n";
-        error();
+        if (cfg.exists("gain")) {
+            cerr << "RTLSDR configuration error: gain cannot be used when AGC is enabled\n";
+            error();
+        }
     }
     if (cfg.exists("correction")) {
         dev_data->correction = (int)cfg["correction"];
@@ -227,6 +250,7 @@ MODULE_EXPORT input_t* rtlsdr_input_new() {
     dev_data->index = -1;  // invalid default receiver index
     dev_data->gain = -1;   // invalid default gain value
     dev_data->bufcnt = RTLSDR_DEFAULT_LIBUSB_BUFFER_COUNT;
+    dev_data->agc = false;
     /*	return &( input_t ){
                     .dev_data = dev_data,
                     .state = INPUT_UNKNOWN,
