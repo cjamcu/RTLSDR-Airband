@@ -48,6 +48,7 @@
 #include <sstream>
 #include <string>
 #include "config.h"
+#include "file_upload.h"
 #include "helper_functions.h"
 #include "input-common.h"
 #include "rtl_airband.h"
@@ -334,10 +335,15 @@ static void close_file(output_t* output) {
         fwrite(output->lamebuf, 1, lametag_size, fdata->f);
     }
 
+    std::string finished_path;
     if (fdata->f) {
         fclose(fdata->f);
         fdata->f = NULL;
         rename_if_exists(fdata->file_path_tmp.c_str(), fdata->file_path.c_str());
+        finished_path = fdata->file_path;
+    }
+    if (!finished_path.empty() && !fdata->upload_url.empty()) {
+        enqueue_upload(finished_path, *fdata);
     }
     fdata->file_path.clear();
     fdata->file_path_tmp.clear();

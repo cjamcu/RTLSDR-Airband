@@ -13,6 +13,7 @@ RUN apt-get update && \
       libfftw3-dev \
       libsoapysdr-dev \
       libpulse-dev \
+      libcurl4-openssl-dev \
       \
       git \
       ca-certificates \
@@ -82,6 +83,7 @@ RUN apt-get update && \
     libfftw3-single3 \
     libsoapysdr0.8 \
     libpulse0 \
+    libcurl4 \
     libusb-1.0-0-dev \
     && \
   apt-get clean && \

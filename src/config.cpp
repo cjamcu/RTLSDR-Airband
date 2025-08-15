@@ -98,7 +98,8 @@ static int parse_outputs(libconfig::Setting& outs, channel_t* channel, int i, in
 
             channel->outputs[oo].has_mp3_output = true;
         } else if (!strncmp(outs[o]["type"], "file", 4)) {
-            channel->outputs[oo].data = XCALLOC(1, sizeof(struct file_data));
+            // Allocate with constructor: file_data contains std::string members
+            channel->outputs[oo].data = new file_data();
             channel->outputs[oo].type = O_FILE;
             file_data* fdata = (file_data*)(channel->outputs[oo].data);
 
@@ -112,8 +113,12 @@ static int parse_outputs(libconfig::Setting& outs, channel_t* channel, int i, in
                 cerr << "both directory and filename_template required for file\n";
                 error();
             }
-            fdata->basedir = outs[o]["directory"].c_str();
-            fdata->basename = outs[o]["filename_template"].c_str();
+            if (outs[o]["directory"].getType() != libconfig::Setting::TypeString || outs[o]["filename_template"].getType() != libconfig::Setting::TypeString) {
+                cerr << "Configuration error: devices.[" << i << "] channels.[" << j << "] outputs.[" << o << "]: both directory and filename_template must be strings\n";
+                error();
+            }
+            fdata->basedir = static_cast<const char*>(outs[o]["directory"]);
+            fdata->basename = static_cast<const char*>(outs[o]["filename_template"]);
             fdata->dated_subdirectories = outs[o].exists("dated_subdirectories") ? (bool)(outs[o]["dated_subdirectories"]) : false;
             fdata->suffix = ".mp3";
 
@@ -121,6 +126,30 @@ static int parse_outputs(libconfig::Setting& outs, channel_t* channel, int i, in
             fdata->append = (!outs[o].exists("append")) || (bool)(outs[o]["append"]);
             fdata->split_on_transmission = outs[o].exists("split_on_transmission") ? (bool)(outs[o]["split_on_transmission"]) : false;
             fdata->include_freq = outs[o].exists("include_freq") ? (bool)(outs[o]["include_freq"]) : false;
+            if (outs[o].exists("upload_url")) {
+                if (outs[o]["upload_url"].getType() != libconfig::Setting::TypeString) {
+                    cerr << "Configuration error: devices[" << i << "] channels[" << j << "] outputs[" << o << "]: upload_url must be a string\n";
+                    error();
+                }
+                fdata->upload_url = static_cast<const char*>(outs[o]["upload_url"]);
+            } else {
+                fdata->upload_url.clear();
+            }
+            fdata->delete_after_upload = outs[o].exists("delete_after_upload") ? (bool)(outs[o]["delete_after_upload"]) : false;
+            fdata->upload_retry_interval = outs[o].exists("upload_retry_interval") ? (int)(outs[o]["upload_retry_interval"]) : 60;
+            if (fdata->upload_retry_interval <= 0) {
+                cerr << "Configuration error: devices[" << i << "] channels[" << j << "] outputs[" << o << "]: upload_retry_interval must be positive\n";
+                error();
+            }
+            fdata->upload_pending_on_start = outs[o].exists("upload_pending_on_start") ? (bool)(outs[o]["upload_pending_on_start"]) : false;
+            if (outs[o].exists("upload_url") && fdata->upload_url.empty()) {
+                cerr << "Configuration error: devices[" << i << "] channels[" << j << "] outputs[" << o << "]: upload_url may not be empty\n";
+                error();
+            }
+            if (!fdata->upload_url.empty()) {
+                log(LOG_INFO, "File output will upload to %s delete_after_upload=%d retry_interval=%d scan_on_start=%d\n", fdata->upload_url.c_str(), fdata->delete_after_upload,
+                    fdata->upload_retry_interval, fdata->upload_pending_on_start);
+            }
 
             channel->outputs[oo].has_mp3_output = true;
 
@@ -140,7 +169,8 @@ static int parse_outputs(libconfig::Setting& outs, channel_t* channel, int i, in
                 cerr << "Configuration error: mixers.[" << i << "] outputs[" << o << "]: rawfile output is not allowed for mixers\n";
                 error();
             }
-            channel->outputs[oo].data = XCALLOC(1, sizeof(struct file_data));
+            // Allocate with constructor: file_data contains std::string members
+            channel->outputs[oo].data = new file_data();
             channel->outputs[oo].type = O_RAWFILE;
             file_data* fdata = (file_data*)(channel->outputs[oo].data);
 
@@ -150,8 +180,12 @@ static int parse_outputs(libconfig::Setting& outs, channel_t* channel, int i, in
                 error();
             }
 
-            fdata->basedir = outs[o]["directory"].c_str();
-            fdata->basename = outs[o]["filename_template"].c_str();
+            if (outs[o]["directory"].getType() != libconfig::Setting::TypeString || outs[o]["filename_template"].getType() != libconfig::Setting::TypeString) {
+                cerr << "Configuration error: devices.[" << i << "] channels.[" << j << "] outputs.[" << o << "]: both directory and filename_template must be strings\n";
+                error();
+            }
+            fdata->basedir = static_cast<const char*>(outs[o]["directory"]);
+            fdata->basename = static_cast<const char*>(outs[o]["filename_template"]);
             fdata->dated_subdirectories = outs[o].exists("dated_subdirectories") ? (bool)(outs[o]["dated_subdirectories"]) : false;
             fdata->suffix = ".cf32";
 
