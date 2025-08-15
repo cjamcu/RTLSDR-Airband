@@ -51,6 +51,7 @@
 #include "helper_functions.h"
 #include "input-common.h"
 #include "rtl_airband.h"
+#include "file_upload.h"
 
 void shout_setup(icecast_data* icecast, mix_modes mixmode) {
     int ret;
@@ -334,10 +335,25 @@ static void close_file(output_t* output) {
         fwrite(output->lamebuf, 1, lametag_size, fdata->f);
     }
 
+    std::string finished_path;
     if (fdata->f) {
-        fclose(fdata->f);
+        int fd = fileno(fdata->f);
+        fflush(fdata->f);
+        if (fsync(fd) != 0) {
+            log(LOG_ERR, "fsync(%s) failed: %s\n", fdata->file_path_tmp.c_str(), strerror(errno));
+        }
+        if (fclose(fdata->f) != 0) {
+            log(LOG_ERR, "fclose(%s) failed: %s\n", fdata->file_path_tmp.c_str(), strerror(errno));
+        }
         fdata->f = NULL;
-        rename_if_exists(fdata->file_path_tmp.c_str(), fdata->file_path.c_str());
+        if (rename_if_exists(fdata->file_path_tmp.c_str(), fdata->file_path.c_str()) == 0) {
+            finished_path = fdata->file_path;
+        } else {
+            log(LOG_ERR, "Could not rename %s to %s\n", fdata->file_path_tmp.c_str(), fdata->file_path.c_str());
+        }
+    }
+    if (!finished_path.empty() && !fdata->upload_url.empty()) {
+        enqueue_upload(finished_path, *fdata);
     }
     fdata->file_path.clear();
     fdata->file_path_tmp.clear();

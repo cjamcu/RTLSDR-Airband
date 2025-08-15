@@ -32,6 +32,19 @@ radios are now supported as well.
 
 User's manual is now on the [wiki](https://github.com/rtl-airband/RTLSDR-Airband/wiki).
 
+## File upload configuration
+
+When using `file` outputs, recorded files can be uploaded via HTTP POST. Configure an output with:
+
+```
+upload_url = "https://example.com/upload";
+delete_after_upload = true;
+upload_retry_interval = 60;
+upload_pending_on_start = false;
+```
+
+Failed uploads are retried after a positive `upload_retry_interval` number of seconds. If `delete_after_upload` is set, successful uploads remove the local copy; otherwise the file name has `_uploaded` inserted before the extension so retries are skipped on subsequent runs. Uploads are initially attempted about one second after a file is closed to ensure the recording is fully written. Pending files can be scanned and enqueued on startup when `upload_pending_on_start` is set to `true`.
+
 ## Credits and thanks
 
 I hereby express my gratitude to everybody who helped with the development and testing
