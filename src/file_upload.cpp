@@ -186,4 +186,3 @@ void scan_pending_uploads() {
         }
     }
 }
-
