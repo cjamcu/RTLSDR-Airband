@@ -140,6 +140,10 @@ struct file_data {
     bool append;
     bool split_on_transmission;
     bool include_freq;
+    std::string upload_url;
+    bool delete_after_upload;
+    int upload_retry_interval;
+    bool upload_pending_on_start;
     timeval open_time;
     timeval last_write_time;
     FILE* f;
