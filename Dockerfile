@@ -86,7 +86,8 @@ RUN apt-get update && \
     libpulse0 \
     libcurl4 \
     libusb-1.0-0-dev \
-    && \
+    ca-certificates \
+  && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
