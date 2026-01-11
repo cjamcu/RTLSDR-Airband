@@ -76,6 +76,7 @@ RUN apt-get update && \
   apt-get upgrade -y && \
   apt-get install -y --no-install-recommends \
     tini \
+    ca-certificates \
     libc6 \
     libmp3lame0 \
     libshout3 \
